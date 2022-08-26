@@ -13,6 +13,7 @@ class ZanfiYouTube{
 	var $elapsed_start;
 	var $elapsed_time;
 	var $downloaded_bytes;
+	var $downloaded_file_name;
 	
 	function __construct($vId = null){
 		
@@ -467,6 +468,8 @@ class ZanfiYouTube{
 		
 		
 		$destination_path = $this->filter_filename($destination_path);
+		
+		$this->downloaded_file_name = $destination_path;
 
 		$fp = fopen($destination_path, "w+");
 		
