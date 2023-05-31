@@ -22,6 +22,7 @@ class ZanfiYouTube{
 			throw new Exception("Please pass a youtube video to fetch.");
 			
 			return(false);
+			
 		}
 		
         $this->video_id = $this->get_video_id($vId);
@@ -34,11 +35,11 @@ class ZanfiYouTube{
 		
 		// uses https://m.youtube.com/watch?v=[VIDEO_ID] to get the html with the streaming data
 		// signature must be deciphered
-		// $this->getVideoInfo();
+		$this->getVideoInfo();
 		
 		// uses https://www.youtube.com/youtubei/v1/player?key=AIzaSyA8eiZmM1FaDVjRy-df2KTyQ_vz_yYM39w to get the streaming data
 		// urls ready, no signature to decipher (preferred)
-		$this->getVideoInfoDroid();
+		// $this->getVideoInfoDroid();
 		
 		(isset($this->arr_Video_info['streamingData']['adaptiveFormats'])) ? $this->arr_Video_adaptive_formats = $this->arr_Video_info['streamingData']['adaptiveFormats'] : $this->arr_Video_adaptive_formats = [];
 		
@@ -85,7 +86,6 @@ class ZanfiYouTube{
 			
 		}
 
-		
 	}
 	
 	function get_string_between($string, $start, $end){
