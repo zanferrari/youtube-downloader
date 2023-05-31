@@ -1,17 +1,13 @@
 # youtube-downloader
  A php only youtube parser and downloader
 
-**Zanfi Youtube downloader** is a blazing fast Youtube parser and Audio+Video or Audio only downloader.
+**Zanfi Youtube downloader** is Youtube parser and Audio+Video or Audio only downloader.
+
+31 may 2023 - Suffering of throttling while download. Takes more time to download a file.
 
 It uses only 1 php class without third party software. It makes no use of the Youtube API (so no api key is needed).
 
 Inspired from the (php) Athlon1600/youtube-downloader and, of course, from the youtube-dl and yt-dlp which are built with Python.
-
-I was annoyed by the throttling that Youtube uses when downloading from an adaptive stream. With this class I measured download speeds even better than yt-dlp.
-
-Just before putting this class online, I got this result:
-
-\- Downloaded 5148614 bytes in **0.56019806861877 seconds**
 
 **How to use the class**:
 
