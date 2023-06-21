@@ -10,10 +10,11 @@ class ZanfiYouTube{
 	var $arr_Video_thumbnails;
 	var $youtube_html;
 	var $base_js;
-	var $elapsed_start;
-	var $elapsed_time;
-	var $downloaded_bytes;
-	var $downloaded_file_name;
+	var $signature;
+	var $arrUrl;
+	var $title;
+	var $arrStart;
+	var $arrEnd;
 	
 	function __construct($vId = null){
 		
@@ -22,13 +23,12 @@ class ZanfiYouTube{
 			throw new Exception("Please pass a youtube video to fetch.");
 			
 			return(false);
-			
 		}
 		
         $this->video_id = $this->get_video_id($vId);
 		
 		// itags for video+audio stream good quality to worser
-		$this->arrBestBoth = array(37,46,22,18);
+		$this->arrBestBoth = array(38,37,22,18);
 		
 		// itags for audio stream good quality to worser
 		$this->arrBestAudio = array(141,140,251,171);
@@ -36,10 +36,6 @@ class ZanfiYouTube{
 		// uses https://m.youtube.com/watch?v=[VIDEO_ID] to get the html with the streaming data
 		// signature must be deciphered
 		$this->getVideoInfo();
-		
-		// uses https://www.youtube.com/youtubei/v1/player?key=AIzaSyA8eiZmM1FaDVjRy-df2KTyQ_vz_yYM39w to get the streaming data
-		// urls ready, no signature to decipher (preferred)
-		// $this->getVideoInfoDroid();
 		
 		(isset($this->arr_Video_info['streamingData']['adaptiveFormats'])) ? $this->arr_Video_adaptive_formats = $this->arr_Video_info['streamingData']['adaptiveFormats'] : $this->arr_Video_adaptive_formats = [];
 		
@@ -49,24 +45,13 @@ class ZanfiYouTube{
 		
 		$this->check_url_signed($this->arr_Video_formats);
 		
+		//experimental (calculate contentlength missing in 'formats')
+		$this->calculate_content_length($this->arr_Video_formats);
+		
+		
 		(isset($this->arr_Video_info['videoDetails']['thumbnail'])) ? $this->arr_Video_thumbnails = $this->arr_Video_info['videoDetails']['thumbnail'] : $this->arr_Video_thumbnails = [];
 		
     }
-	
-	function getTime(){
-		
-		$a = explode (' ',microtime());
-		return(double) $a[0] + $a[1];
-		
-	}
-	
-	function exec_time(){
-		
-		$endtime = $this->getTime();
-		
-		$this->elapsed_time = $endtime-$this->elapsed_start;
-		
-	}
 	
 	function get_video_id($str){
 		
@@ -86,6 +71,7 @@ class ZanfiYouTube{
 			
 		}
 
+		
 	}
 	
 	function get_string_between($string, $start, $end){
@@ -120,9 +106,7 @@ class ZanfiYouTube{
 			
 		}
 		
-		echo('<pre>');
-		var_dump($arr);
-		echo('</pre>');
+		$this->printFormatted($arr);
 		
 	}
 	
@@ -174,7 +158,43 @@ class ZanfiYouTube{
 					
 					$arrExt = explode('/', $arrMmimeType[0]);
 					
-					$this->download($val['url'], $this->arr_Video_info['videoDetails']['title'] . '.' . $arrExt[1]);
+					if(isset($val["contentLength"])){
+						
+						$range = 750000;
+						
+						$end = $range;
+						$inc = $range;
+						$start = 0;
+						
+						if(file_exists($this->arr_Video_info['videoDetails']['title'] . '.' . $arrExt[1])) unlink($this->arr_Video_info['videoDetails']['title'] . '.' . $arrExt[1]);
+						
+						while($end < $val["contentLength"]){
+							
+							$this->arrUrl[] = $val['url'];
+							$this->title = $this->arr_Video_info['videoDetails']['title'] . '.' . $arrExt[1];
+							$this->arrStart[] = $start;
+							$this->arrEnd[] = $end;
+							
+							$start = $end + 1;
+							(($end += $inc) >= $val["contentLength"]) ? $end = $val["contentLength"] : $end += $inc;
+							
+						}
+						
+						$this->arrUrl[] = $val['url'];
+						$this->title = $this->arr_Video_info['videoDetails']['title'] . '.' . $arrExt[1];
+						$this->arrStart[] = $start;
+						$this->arrEnd[] = $end;						
+						
+					}else{
+						
+						$this->arrUrl[] = $val['url'];
+						$this->title = $this->arr_Video_info['videoDetails']['title'] . '.' . $arrExt[1];
+						$this->arrStart[] = 0;
+						$this->arrEnd[] = null;
+						
+					}
+					
+					$this->multi_curl();
 					
 					$break = 1;
 					
@@ -230,7 +250,32 @@ class ZanfiYouTube{
 					
 					$arrExt = explode('/', $arrMmimeType[0]);
 					
-					$this->download($val['url'], $this->arr_Video_info['videoDetails']['title'] . '.' . $arrExt[1]);
+					$range = 350000;
+					
+					$end = $range;
+					$inc = $range;
+					$start = 0;
+					
+					if(file_exists($this->arr_Video_info['videoDetails']['title'] . '.' . $arrExt[1])) unlink($this->arr_Video_info['videoDetails']['title'] . '.' . $arrExt[1]);
+					
+					while($end < $val["contentLength"]){
+						
+						$this->arrUrl[] = $val['url'];
+						$this->title = $this->arr_Video_info['videoDetails']['title'] . '.' . $arrExt[1];
+						$this->arrStart[] = $start;
+						$this->arrEnd[] = $end;
+						
+						$start = $end + 1;
+						(($end += $inc) >= $val["contentLength"]) ? $end = $val["contentLength"] : $end += $inc;
+						
+					}
+					
+					$this->arrUrl[] = $val['url'];
+					$this->title = $this->arr_Video_info['videoDetails']['title'] . '.' . $arrExt[1];
+					$this->arrStart[] = $start;
+					$this->arrEnd[] = $end;
+					
+					$this->multi_curl();
 					
 					$break = 1;
 					
@@ -246,80 +291,111 @@ class ZanfiYouTube{
 		
 	}
 	
-	function getVideoInfoDroid(){
-
-		$ch = curl_init();
-
-		curl_setopt($ch, CURLOPT_URL, 'https://www.youtube.com/youtubei/v1/player?key=AIzaSyA8eiZmM1FaDVjRy-df2KTyQ_vz_yYM39w');
-		curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-		curl_setopt($ch, CURLOPT_POST, 1);
-		curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
-		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
-		curl_setopt($ch, CURLOPT_POSTFIELDS, '{
-											   "context":{
-												  "client":{
-													 "hl":"en",
-													 "clientName":"ANDROID",
-													 "clientVersion":"17.29.34",
-													 "clientFormFactor":"UNKNOWN_FORM_FACTOR",
-													 "clientScreen":"WATCH",
-													 "mainAppWebInfo":{
-														"graftUrl":"/watch?v='.$this->video_id.'"
-													 }
-												  },
-												  "user":{
-													 "lockedSafetyMode":false
-												  },
-												  "request":{
-													 "useSsl":true,
-													 "internalExperimentFlags":[
-													 ],
-													 "consistencyTokenJars":[
-													 ]
-												  }
-											   },
-											   "videoId":"'.$this->video_id.'",
-											   "playbackContext":{
-												  "contentPlaybackContext":{
-													 "vis":0,
-													 "splay":false,
-													 "autoCaptionsDefaultOn":false,
-													 "autonavState":"STATE_NONE",
-													 "html5Preference":"HTML5_PREF_WANTS",
-													 "lactMilliseconds":"-1"
-												  }
-											   },
-											   "racyCheckOk":false,
-											   "contentCheckOk":false
-											}');
-		curl_setopt($ch, CURLOPT_ENCODING, 'gzip, deflate');
-
-		$headers = array();
-		$headers[] = 'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8';
-		$headers[] = 'Accept-encoding: gzip, deflate';
-		$headers[] = 'Accept-Language: en-US,en;q=0.5';
-		$headers[] = 'cache-control: max-age=0';
-		$headers[] = 'Sec-Fetch-Dest: document';
-		$headers[] = 'Sec-Fetch-Mode: navigate';
-		$headers[] = 'Sec-Fetch-Site: same-origin';
-		$headers[] = 'Sec-Fetch-User: ?1';
-		$headers[] = 'Sec-Gpc: 1';
-		$headers[] = 'Range: bytes=0-';
-		$headers[] = 'service-worker-navigation-preload: true';
-		$headers[] = 'Upgrade-Insecure-Requests: 1';
-		//$headers[] = 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.5112.102 Safari/537.36';
-		$headers[] = 'User-Agent: Mozilla/5.0 (Linux; U; Android 2.1-update1; ru-ru; GT-I9000 Build/ECLAIR) AppleWebKit/530.17 (KHTML, like Gecko) Version/4.0 Mobile Safari/530.17';
-		$headers[] = 'Content-Type: application/json';
-		curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-
-		$result = curl_exec($ch);
-		if (curl_errno($ch)) {
-			echo 'Error:' . curl_error($ch);
-		}
-		curl_close($ch);
+	function multi_curl(){
 		
-		$this->arr_Video_info = json_decode($result, true);;
+		if(isset($this->arrUrl) && is_array($this->arrUrl)){
+	
+			set_time_limit(0);
+			
+			$prefix = array('a','b','c','d','e','f','g','h','i','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z');
 
+			$headers = array();
+			$headers[] = 'Accep: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7';
+			$headers[] = 'Accept-encoding: gzip, deflate, br';
+			$headers[] = 'Accept-Language: en-US,en;q=0.9';
+			$headers[] = 'Referer: https://google.com/';
+			$headers[] = 'Sec-Ch-Ua-Platform: "Windows"';
+			$headers[] = 'Accept-ranges: bytes';
+			$headers[] = 'Sec-Ch-Ua: "Not.A/Brand";v="8", "Chromium";v="114", "Brave";v="114"';
+			$headers[] = 'Cache-Control: max-age=0';
+			$headers[] = 'Pragma: no-cache';
+			$headers[] = 'Sec-Fetch-Dest: document';
+			$headers[] = 'Sec-Fetch-Mode: navigate';
+			$headers[] = 'Sec-Fetch-Site: cross-site';
+			$headers[] = 'Sec-Fetch-User: ?1';
+			$headers[] = 'Sec-Gpc: 1';
+			$headers[] = 'service-worker-navigation-preload: true';
+			$headers[] = 'Upgrade-Insecure-Requests: 1';
+			$headers[] = 'User-Agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36 OPR/99.0.0.0';
+			
+			foreach($this->arrUrl as $key => $val){
+				
+				$ch[$key] = curl_init();
+				
+				curl_setopt($ch[$key], CURLOPT_URL, $val);
+				curl_setopt($ch[$key], CURLOPT_RETURNTRANSFER, 1);
+				curl_setopt($ch[$key], CURLOPT_SSL_VERIFYHOST, 0);
+				curl_setopt($ch[$key], CURLOPT_SSL_VERIFYPEER, 0);
+				curl_setopt($ch[$key], CURLOPT_CUSTOMREQUEST, 'GET');
+				curl_setopt($ch[$key], CURLOPT_RANGE, "{$this->arrStart[$key]}-{$this->arrEnd[$key]}");
+				curl_setopt($ch[$key], CURLOPT_BINARYTRANSFER, 1);
+				curl_setopt($ch[$key], CURLOPT_BUFFERSIZE, 1024*4);
+				curl_setopt($ch[$key], CURLOPT_ENCODING, 'gzip, deflate');
+				curl_setopt($ch[$key], CURLOPT_HTTPHEADER, $headers);
+				
+			}
+			
+			$mh = curl_multi_init();
+			
+			foreach($this->arrUrl as $key => $val){
+				
+				curl_multi_add_handle($mh,$ch[$key]);
+				
+			}	
+			
+			do {
+				$status = curl_multi_exec($mh, $active);
+				if ($active) {
+					curl_multi_select($mh);
+				}
+			} while ($active && $status == CURLM_OK);
+			
+			foreach($this->arrUrl as $key => $val){
+			
+				curl_multi_remove_handle($mh, $ch[$key]);
+			
+			}
+			
+			curl_multi_close($mh);
+			
+			foreach($this->arrUrl as $key => $val){
+			
+				$response[$key] = curl_multi_getcontent($ch[$key]);
+				
+				$this->title = $this->filter_filename($this->title);
+				
+				$arrCmd[] = __DIR__ . DIRECTORY_SEPARATOR . $prefix[$key] . '_' . $this->title;
+				
+				file_put_contents($prefix[$key] . '_' . $this->title, $response[$key]);
+			
+			}
+			
+			if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+				
+				$files = '"' . implode('"+"', $arrCmd) . '"';
+				
+				$cmd = 'copy /b ' . $files . ' "' . __DIR__ . DIRECTORY_SEPARATOR . $this->title . '"';
+				
+				$res = system($cmd, $retval);
+				
+			} else {
+				
+				$files = '"' . implode('" "', $arrCmd) . '"';
+				
+				$cmd = 'cat ' . $files . ' > "' . __DIR__ . DIRECTORY_SEPARATOR . $this->title . '"';
+				
+				$res = system($cmd, $retval);
+				
+			}
+			
+			foreach($this->arrUrl as $key => $val){
+				
+				if(file_exists($prefix[$key] . '_' . $this->title)) unlink($prefix[$key] . '_' . $this->title);
+				
+			}
+			
+		}		
+		
 	}
 	
 	function getVideoInfo(){
@@ -379,6 +455,7 @@ class ZanfiYouTube{
             }
         }
 
+		$this->signature = trim($signature);
         return trim($signature);
 		
     }
@@ -386,17 +463,21 @@ class ZanfiYouTube{
 	// thanks to https://github.com/Athlon1600/youtube-downloader
     public function parseFunctionName(){
 		
-        if (preg_match('@,\s*encodeURIComponent\((\w{2})@is', $this->base_js, $matches)) {
-            $func_name = $matches[1];
-            $func_name = preg_quote($func_name);
+		if(!is_null($this->base_js)){
+			
+			if (preg_match('@,\s*encodeURIComponent\((\w{2})@is', $this->base_js, $matches)) {
+				$func_name = $matches[1];
+				$func_name = preg_quote($func_name);
 
-            return $func_name;
+				return $func_name;
 
-        } else if (preg_match('@(?:\b|[^a-zA-Z0-9$])([a-zA-Z0-9$]{2,3})\s*=\s*function\(\s*a\s*\)\s*{\s*a\s*=\s*a\.split\(\s*""\s*\)@is', $this->base_js, $matches)) {
+			} else if (preg_match('@(?:\b|[^a-zA-Z0-9$])([a-zA-Z0-9$]{2,3})\s*=\s*function\(\s*a\s*\)\s*{\s*a\s*=\s*a\.split\(\s*""\s*\)@is', $this->base_js, $matches)) {
 
-            return preg_quote($matches[1]);
+				return preg_quote($matches[1]);
 
-        }
+			}
+			
+		}
 
         return(null);
 		
@@ -409,128 +490,58 @@ class ZanfiYouTube{
         // extract code block from that function
         // single quote in case function name contains $dollar sign
         // xm=function(a){a=a.split("");wm.zO(a,47);wm.vY(a,1);wm.z9(a,68);wm.zO(a,21);wm.z9(a,34);wm.zO(a,16);wm.z9(a,41);return a.join("")};
-        if (preg_match('/' . $func_name . '=function\([a-z]+\){(.*?)}/', $this->base_js, $matches)) {
-
-            $js_code = $matches[1];
-			//echo('<pre>');var_dump($js_code);echo('</pre>');
-
-            // extract all relevant statements within that block
-            // wm.vY(a,1);
-            if (preg_match_all('/([a-z0-9$]{2})\.([a-z0-9]{2})\([^,]+,(\d+)\)/i', $js_code, $matches) != false) {
-
-                // wm
-                $obj_list = $matches[1];
-
-                // vY
-                $func_list = $matches[2];
-
-                // extract javascript code for each one of those statement functions
-                preg_match_all('/(' . implode('|', $func_list) . '):function(.*?)\}/m', $this->base_js, $matches2, PREG_SET_ORDER);
-				// echo('<pre>');var_dump($matches2);echo('</pre>');
-				
-
-                $functions = array();
-
-                // translate each function according to its use
-                foreach ($matches2 as $m) {
-
-                    if (strpos($m[2], 'splice') !== false) {
-                        $functions[$m[1]] = 'splice';
-                    } elseif (strpos($m[2], 'a.length') !== false) {
-                        $functions[$m[1]] = 'swap';
-                    } elseif (strpos($m[2], 'reverse') !== false) {
-                        $functions[$m[1]] = 'reverse';
-                    }
-                }
-
-                // FINAL STEP! convert it all to instructions set
-                $instructions = array();
-
-                foreach ($matches[2] as $index => $name) {
-                    $instructions[] = array($functions[$name], $matches[3][$index]);
-                }
-				// echo('<pre>');var_dump($instructions);echo('</pre>');
-                return $instructions;
-            }
+		if(!is_null($this->base_js)){
 			
-        }
+			if (preg_match('/' . $func_name . '=function\([a-z]+\){(.*?)}/', $this->base_js, $matches)) {
+
+				$js_code = $matches[1];
+				//echo('<pre>');var_dump($js_code);echo('</pre>');
+
+				// extract all relevant statements within that block
+				// wm.vY(a,1);
+				if (preg_match_all('/([a-z0-9$]{2})\.([a-z0-9]{2})\([^,]+,(\d+)\)/i', $js_code, $matches) != false) {
+
+					// wm
+					$obj_list = $matches[1];
+
+					// vY
+					$func_list = $matches[2];
+
+					// extract javascript code for each one of those statement functions
+					preg_match_all('/(' . implode('|', $func_list) . '):function(.*?)\}/m', $this->base_js, $matches2, PREG_SET_ORDER);
+					// echo('<pre>');var_dump($matches2);echo('</pre>');
+					
+
+					$functions = array();
+
+					// translate each function according to its use
+					foreach ($matches2 as $m) {
+
+						if (strpos($m[2], 'splice') !== false) {
+							$functions[$m[1]] = 'splice';
+						} elseif (strpos($m[2], 'a.length') !== false) {
+							$functions[$m[1]] = 'swap';
+						} elseif (strpos($m[2], 'reverse') !== false) {
+							$functions[$m[1]] = 'reverse';
+						}
+					}
+
+					// FINAL STEP! convert it all to instructions set
+					$instructions = array();
+
+					foreach ($matches[2] as $index => $name) {
+						$instructions[] = array($functions[$name], $matches[3][$index]);
+					}
+					// echo('<pre>');var_dump($instructions);echo('</pre>');
+					return $instructions;
+				}
+				
+			}
+		
+		}	
 
         return(null);
     }
-	
-	function download($file_url,$destination_path){
-		
-		// start counting execution time.
-		$this->elapsed_start = $this->getTime();
-		
-		// uncomment line below for very large downloads (to avoid max excedeed time error)
-		// set_time_limit(0);
-		
-		
-		$destination_path = $this->filter_filename($destination_path);
-		
-		$this->downloaded_file_name = $destination_path;
-
-		$fp = fopen($destination_path, "w+");
-		
-		$ch = curl_init();
-		
-		$arrUrl = parse_url($file_url);
-
-		curl_setopt($ch, CURLOPT_URL, $file_url);
-		curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-		curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
-		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, 0);
-		curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'GET');
-		// uncomment the 2 lines below to see progrees in browser
-		// curl_setopt($ch, CURLOPT_NOPROGRESS, 0 );
-		// curl_setopt($ch, CURLOPT_PROGRESSFUNCTION, array($this, 'downloadProgress')); 
-		curl_setopt($ch, CURLOPT_BUFFERSIZE, 1024*4);
-		curl_setopt($ch, CURLOPT_ENCODING, 'gzip, deflate');
-
-		$headers = array();
-		$headers[] = $arrUrl['host'];
-		$headers[] = 'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8';
-		$headers[] = 'Accept-encoding: gzip, deflate';
-		$headers[] = 'Accept-Language: en-US,en;q=0.5';
-		$headers[] = 'cache-control: max-age=0';
-		$headers[] = 'Sec-Fetch-Dest: document';
-		$headers[] = 'Sec-Fetch-Mode: navigate';
-		$headers[] = 'Sec-Fetch-Site: same-origin';
-		$headers[] = 'Sec-Fetch-User: ?1';
-		$headers[] = 'Sec-Gpc: 1';
-		$headers[] = 'Range: bytes=0-';
-		$headers[] = 'service-worker-navigation-preload: true';
-		$headers[] = 'Upgrade-Insecure-Requests: 1';
-		//$headers[] = 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.5112.102 Safari/537.36';
-		$headers[] = 'User-Agent: Mozilla/5.0 (Linux; U; Android 2.1-update1; ru-ru; GT-I9000 Build/ECLAIR) AppleWebKit/530.17 (KHTML, like Gecko) Version/4.0 Mobile Safari/530.17';
-		curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-		curl_setopt($ch, CURLOPT_FILE, $fp);
-
-		$result = curl_exec($ch);
-		if (curl_errno($ch)) {
-			echo 'Error:' . curl_error($ch);
-		}
-		
-		$info = curl_getinfo($ch);
-		$this->downloaded_bytes = $info['size_download'];
-		
-		curl_close($ch);
-
-		fclose($fp);
-		
-		$this->exec_time();
-		
-	}
-	
-	function downloadProgress ($ch, $download_size, $downloaded_size, $upload_size, $uploaded_size) {
-		
-		ob_start();
-		echo 'download_size: ' . $download_size . '; downloaded_size: ' . $downloaded_size . ';<br>';
-		ob_flush();
-		ob_end_flush();
-		
-	}
 	
 	function check_url_signed(&$arrVideo){
 		
@@ -542,6 +553,8 @@ class ZanfiYouTube{
 				
 				$SigDec = $this->decode($strCipher['s']);
 				
+				//if($val['itag'] == 140) echo($SigDec.'<br>');
+				
 				$urlSigned = $strCipher['url'] . '&' . $strCipher['sp'] . '=' . $SigDec;
 				
 				$arrVideo[$key]['url'] = $urlSigned;
@@ -549,6 +562,21 @@ class ZanfiYouTube{
 			}
 			
 		}
+		
+	}
+	
+	function calculate_content_length(&$arrVideo){
+		
+		foreach($arrVideo as $key => $val){
+			
+			if(!isset($val['contentLength'])){
+				
+				$arrVideo[$key]['contentLength'] = round($val['bitrate'] * $val['approxDurationMs']/1000/60 * 0.0075) * 1000;
+				
+			}
+			
+		}
+		
 		
 	}
 	
