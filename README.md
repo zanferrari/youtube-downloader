@@ -4,6 +4,7 @@
 **Zanfi Youtube downloader** is Youtube parser and Audio+Video or Audio only downloader.
 
 31 may 2023 - Suffering of throttling while download. Takes more time to download a file.
+
 21 june 2023 - Implemented multiple CUrl downloads in chunks
 
 It uses only 1 php class without third party software. It makes no use of the Youtube API (so no api key is needed).
