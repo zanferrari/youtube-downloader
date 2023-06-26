@@ -296,8 +296,6 @@ class ZanfiYouTube{
 		if(isset($this->arrUrl) && is_array($this->arrUrl)){
 	
 			set_time_limit(0);
-			
-			$prefix = array('a','b','c','d','e','f','g','h','i','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z');
 
 			$headers = array();
 			$headers[] = 'Accep: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7';
@@ -364,11 +362,13 @@ class ZanfiYouTube{
 				
 				$this->title = $this->filter_filename($this->title);
 				
-				$arrCmd[] = __DIR__ . DIRECTORY_SEPARATOR . $prefix[$key] . '_' . $this->title;
+				$arrCmd[] = __DIR__ . DIRECTORY_SEPARATOR . $key . '_' . $this->title;
 				
-				file_put_contents($prefix[$key] . '_' . $this->title, $response[$key]);
+				file_put_contents($key . '_' . $this->title, $response[$key]);
 			
 			}
+			
+			natsort($arrCmd);
 			
 			if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
 				
@@ -390,7 +390,7 @@ class ZanfiYouTube{
 			
 			foreach($this->arrUrl as $key => $val){
 				
-				if(file_exists($prefix[$key] . '_' . $this->title)) unlink($prefix[$key] . '_' . $this->title);
+				if(file_exists($key . '_' . $this->title)) unlink($key . '_' . $this->title);
 				
 			}
 			
